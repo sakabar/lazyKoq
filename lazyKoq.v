@@ -1,6 +1,6 @@
 Require Import List.
+Require Import EqNat.
 Require Import Ascii String.
-
 
 Module LazyKoq.
 Variable stdin : string.
@@ -51,6 +51,7 @@ Inductive evalR : Expr -> Expr -> Prop :=
 Hypothesis I_eq: forall x:Expr, ap i x = x.
 Hypothesis K_eq: forall x y:Expr, (ap (ap k x) y) = x.
 Hypothesis S_eq: forall x y z:Expr, (ap (ap (ap s x) y) z) = (ap (ap x z) (ap y z)).
+Variables F N : Expr.
 
 (* inner_evalを証明するために要請された *)
 Lemma eval_I_res: forall(r:Expr), evalR i r <-> r = i.
@@ -101,6 +102,7 @@ Definition zero := (ap k i).
 Definition one := i.
 Definition two := (ap (ap s (ap (ap s (ap k s)) k)) i).
 Definition succ := (ap s (ap (ap s (ap k s)) k)).
+Definition pred := ap (ap s (ap (ap s (ap k s)) (ap (ap s (ap k (ap s (ap k s)))) (ap (ap s (ap k (ap s (ap k (ap (ap s s)(ap k k)))))) (ap (ap s (ap k (ap s (ap k k)))) (ap (ap s (ap (ap s (ap k s)) k)) (ap k (ap (ap s (ap k (ap s (ap k (ap s i))))) (ap (ap s (ap k (ap s (ap k k)))) (ap (ap s (ap k (ap s i))) k)))))))))) (ap k (ap k (ap k i))).
 
 Theorem succ_zero_is_one: forall f n:Expr,
   (ap (ap (ap succ zero) f) n) = (ap (ap one f) n).
@@ -110,9 +112,9 @@ Proof.
   unfold one.
   intros.
   rewrite I_eq.
-  rewrite S_eq with (x := (ap (ap s (ap k s)) k)) (y := (ap k i)) (z := f).
-  rewrite K_eq with (x := i) (y := f).
-  rewrite S_eq with (x := (ap k s)).
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite S_eq.
   rewrite K_eq.
   rewrite S_eq.
   rewrite I_eq.
@@ -142,23 +144,28 @@ Lemma eval_eq: forall(e r1 r2:Expr),
 Proof.
 Abort.
 
+
 (* 簡約、関数による表現 *)
-(* 停止性を示せない *)
-(* Function reduce(e:Expr) {measure app_length e}: Expr := *)
-(*   match e with *)
-(*   | app i x => reduce x *)
-(*   | i => i *)
+(* ステップ数を制限して停止性を示す *)
+Fixpoint reduce(e:Expr)(step:nat) : Expr :=
+  match step with
+  | O => e
+  | S step' =>
+    match e with
+    | ap i x => reduce x step'
+    | i => i
 
-(*   | (app (app k x) y) => (reduce x) *)
-(*   | k => k *)
-(*   | app k x => app k (reduce x) *)
+    | (ap (ap k x) y) => (reduce x step')
+    | k => k
+    | ap k x => ap k (reduce x step')
 
-(*   | (app (app (app s x) y) z) => (app (app (reduce x) (reduce z)) (app (reduce y) (reduce z))) *)
-(*   | (app (app s x) y) => (app (app s (reduce x)) (reduce y)) *)
-(*   | s => s *)
+    | (ap (ap (ap s x) y) z) => (ap (ap (reduce x step') (reduce z step')) (ap (reduce y step') (reduce z step')))
+    | (ap (ap s x) y) => (ap (ap s (reduce x step')) (reduce y step'))
+    | s => s
 
-(*   | app e1 e2 => (app (reduce e1) (reduce e2)) *)
-(*   end. *)
+    | ap e1 e2 => reduce (ap (reduce e1 step') (reduce e2 step')) step'
+    end
+  end.
 
 (* testZeroを証明するために要請された *)
 Theorem inner_eval: forall (e1 e2 r1 res:Expr),
@@ -194,15 +201,165 @@ Fixpoint church_of_nat(n:nat) : Expr :=
 Definition string_to_church_list(s:string) : list Expr :=
   map church_of_nat (string_to_byte s).
 
-Eval compute in string_to_church_list "Hi".
-
 Definition eCons(x y:Expr) : Expr := 
   ap (ap s (ap (ap s i) (ap k x))) (ap k y).
+Definition eHead(lst:Expr) := ap lst k.
+Definition eTail(lst:Expr) := ap lst (ap k i).
 
 Fixpoint listExpr_to_Expr(l:list Expr) : Expr :=
   match l with
   | nil => church_of_nat 256
   | h :: t => eCons h (listExpr_to_Expr t)
+  end.
+
+Definition lst_zero_one := eCons zero one.
+Example head_lst_zero_one: eHead lst_zero_one = zero.
+Proof.
+  unfold eHead.
+  unfold lst_zero_one.
+  unfold zero.
+  unfold one.
+  unfold eCons.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite I_eq.
+  rewrite K_eq.
+  reflexivity.
+Qed.
+
+Example tail_lst_zero_one: eTail lst_zero_one = one.
+Proof.
+  unfold eTail.
+  unfold lst_zero_one.
+  unfold zero.
+  unfold one.
+  unfold eCons.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite I_eq.
+  rewrite K_eq.
+  rewrite I_eq.
+  reflexivity.
+Qed.
+
+Theorem eCons_eHead: forall(x y:Expr),
+  eHead (eCons x y) = x.
+Proof.
+  intros x y.
+  unfold eHead.
+  unfold eCons.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite I_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  reflexivity.
+Qed.
+
+Theorem eCons_eTail: forall(x y:Expr),
+  eTail (eCons x y) = y.
+Proof.
+  intros x y.
+  unfold eCons.
+  unfold eTail.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite I_eq.
+  rewrite K_eq.
+  rewrite I_eq.
+  reflexivity.
+Qed.
+
+Fixpoint church_num_to_nat(e:Expr) : nat := 256.
+  (* match e with *)
+  (* | ap k i => 0 *)
+  (* | _ => 1 + church_num_to_nat (reduce (ap pred e) 1) *)
+  (* end. *)
+
+Goal forall n f:Expr,
+  ap (ap (reduce (ap succ zero) 1) f) n = ap f n.
+Proof.
+  intros n f.
+  unfold succ.
+  unfold zero.
+  unfold reduce.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite I_eq.
+  reflexivity.
+Qed.
+
+Example church_num_to_nat_0: church_num_to_nat zero = 0.
+Proof.
+Abort.
+
+Example pred_one_is_zero: ap (ap (ap pred one) F) N = N.
+Proof.
+  unfold pred.
+  unfold one.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite I_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite S_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  rewrite S_eq.
+  rewrite I_eq.
+  rewrite I_eq.
+  rewrite I_eq.
+  rewrite K_eq.
+  rewrite K_eq.
+  reflexivity.
+Qed.
+
+Fixpoint church_stream_to_string(lst:Expr)(step:nat): string :=
+  match step with
+  | O => EmptyString
+  | S step' => if beq_nat (church_num_to_nat (eHead lst)) 256 then EmptyString else String (ascii_of_nat (church_num_to_nat (eHead lst))) (church_stream_to_string (eTail lst) step')
   end.
 
 End LazyKoq.
