@@ -21,6 +21,7 @@ lexer.ml
 lexer.mli
 
 #parser.mlyから生成される
+>>>>>>> feature_lex_yacc
 parser.ml
 parser.mli
 
