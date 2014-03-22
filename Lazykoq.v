@@ -24,18 +24,26 @@ Fixpoint ble_nat (n m : nat) : bool :=
       end
   end.
 
-Module LazyKoq.
-(* Variable stdin : string. *)
+Module Lazykoq.
 
-(* HaskellでLazyKインタプリタを作るという記事の実装を参考にした *)
-(* TaPLを参考にした *)
-Inductive Expr : Type :=
-  | V : nat -> Expr
-  | L : Expr -> Expr
-  | A : Expr -> Expr -> Expr
+(* ラムダ式 *)
+Inductive expr : Type :=
+  | V : nat -> expr
+  | L : expr -> expr
+  | A : expr -> expr -> expr
 .
 
-Fixpoint expr_eq(e1 e2:Expr) : bool :=
+Open Scope string_scope.
+Fixpoint string_of_expr(e:expr): string :=
+  match e with
+  | V n => "(V " ++ (String (ascii_of_nat (n + 48)) ")")
+  | L e => "(L " ++ (string_of_expr e) ++ ")"
+  | A e1 e2 =>
+    "(A (" ++ (string_of_expr e1) ++ ") " ++
+       "(" ++ (string_of_expr e2) ++"))"
+  end.
+
+Fixpoint expr_eq(e1 e2:expr) : bool :=
   match e1, e2 with
   | (V n1), (V n2) => beq_nat n1 n2
   | (L t1), (L t2) => expr_eq t1 t2
@@ -49,13 +57,13 @@ Proof. reflexivity. Qed.
 Example expr_eq_test2: expr_eq (L (V 0)) (L (V 1)) = false.
 Proof. reflexivity. Qed.
 
-Definition i : Expr := L (V 0).
-Definition k : Expr := L (L (V 1)).
-Definition s : Expr := L (L (L (A (A (V 2) (V 0)) (A (V 1) (V 0))))).
+Definition i : expr := L (V 0).
+Definition k : expr := L (L (V 1)).
+Definition s : expr := L (L (L (A (A (V 2) (V 0)) (A (V 1) (V 0))))).
 
 (* シフト *)
-Definition termShift(d:Z)(t:Expr) : Expr :=
-  ( fix walk(c:nat)(t:Expr) :=
+Definition termShift(d:Z)(t:expr) : expr :=
+  ( fix walk(c:nat)(t:expr) :=
     match t with
     | V k => if ble_nat c k then V (Zabs_nat ((Z_of_nat k) + d)) else V k
     | L t1 => L (walk (S c) t1)
@@ -86,30 +94,18 @@ Proof.
   Abort.
 
 (* 代入 *)
-Definition termSubst(j:nat)(s t:Expr) : Expr := 
-  ( fix walk(c:nat)(t:Expr) :=
+Definition termSubst(j:nat)(s t:expr) : expr := 
+  ( fix walk(c:nat)(t:expr) :=
   match t with
   | V k => if (beq_nat k (j+c)) then termShift (Z_of_nat c) s else V k 
   | L t1 => L (walk (S c) t1)
   | A t1 t2 => A (walk c t1) (walk c t2)
   end ) O t.
 
-Definition termSubstTop(s t:Expr) := 
+Definition termSubstTop(s t:expr) := 
   termShift (-1) (termSubst 0 (termShift 1 s) t).
 
-
-(* 1ステップの評価 *)
-(* Fixpoint eval1(t:Expr) : Expr := *)
-(*   match t with *)
-(*   | (V _) => t *)
-(*   | (L _) => t *)
-(*   | A (L t12) (V v2) => termSubstTop (V v2) t12 *)
-(*   | A (L t12) (L v2) => termSubstTop (L v2) t12 *)
-(*   | A (L t1) t2 => A (L t1) (eval1 t2) *)
-(*   | A t1 t2 => A (eval1 t1) t2 *)
-(*   end. *)
-
-Fixpoint eval1(t:Expr) : Expr :=
+Fixpoint eval1(t:expr) : expr :=
   match t with
   | V _ => t
   | L _ => t
@@ -126,8 +122,8 @@ Fixpoint eval1(t:Expr) : Expr :=
                end
   end.
 
-Fixpoint eval(t:Expr) : option Expr :=
-  ( fix eval'(t:Expr)(step:nat) : option Expr :=
+Fixpoint eval(t:expr) : option expr :=
+  ( fix eval'(t:expr)(step:nat) : option expr :=
   match step with
   | O => None
   | S step' => if expr_eq t (eval1 t) then Some t else eval' (eval1 t) step'
@@ -136,13 +132,13 @@ Fixpoint eval(t:Expr) : option Expr :=
 Definition zero := (L (L (V 0))).
 Definition one := (L (L (A (V 1) (V 0)))).
 Definition two := (L (L (A (V 1) (A (V 1) (V 0))))).
-Definition succ := (L (L (L (A (V 1) (A (A (V 2) (V 1)) (V 0)))))).
+Definition suc := (L (L (L (A (V 1) (A (A (V 2) (V 1)) (V 0)))))).
 (* Definition pred :=  *)
 
-Definition eCons(x y:Expr) : Expr := 
+Definition eCons(x y:expr) : expr := 
   L (A (A (V 0) x) y).
-Definition eHead(lst:Expr) := (A lst k).
-Definition eTail(lst:Expr) := (A lst (A k i)).
+Definition eHead(lst:expr) := (A lst k).
+Definition eTail(lst:expr) := (A lst (A k i)).
 
 Goal eval (eHead (eCons (V 1) (V 2))) = Some (V 0).
 Proof.
@@ -170,9 +166,9 @@ Abort.
 Goal eval1 (A (L (A (A (V 1) (V 0)) (V 2))) (L (V 0))) = A (A (V 0) (L (V 0))) (V 1).
 Proof. reflexivity. Qed.
 
-Inductive isChurchNum : Expr -> Prop :=
+Inductive isChurchNum : expr -> Prop :=
   | ch0 : isChurchNum (L (L (V 0)))
-  | chA : forall(e:Expr),
+  | chA : forall(e:expr),
     isChurchNum (L (L e)) -> isChurchNum (L (L (A (V 1) e)))
 .
 
@@ -196,12 +192,13 @@ Definition getOpt{X:Type}(s:option X)(d:X) : X :=
   | None => d
   end.
 
-Definition appChurchNum(e:Expr): option Expr := (eval (A (A e (V 1)) (V 0))).
+Definition appChurchNum(e:expr): option expr :=
+  (eval (A (A e (V 1)) (V 0))).
 
-Fixpoint isChurchNumBool(e:Expr) : bool :=
+Fixpoint isChurchNumBool(e:expr) : bool :=
   let notChNum := (L (V 0)) in
   let e' := getOpt (appChurchNum e) notChNum in
-  ( fix isChurchNumBool'(e:Expr) : bool := 
+  ( fix isChurchNumBool'(e:expr) : bool := 
     match e with
     | (V 0) => true
     | A (V 1) e' => isChurchNumBool' e'
@@ -215,7 +212,7 @@ Proof. reflexivity. Qed.
 Goal isChurchNumBool one = true.
 Proof. reflexivity. Qed.
 
-Definition threeQ := (getOpt (eval (A succ two)) (L (V 1))).
+Definition threeQ := (getOpt (eval (A suc two)) (L (V 1))).
 Goal isChurchNumBool threeQ = true.
 Proof. reflexivity. Qed.
 
@@ -228,30 +225,30 @@ Fixpoint string_to_byte(s:string) : list nat :=
   end.
 
 (* 自然数をチャーチ数に変換する *)
-Fixpoint church_of_nat(n:nat) : Expr :=
+Fixpoint church_of_nat(n:nat) : expr :=
   match n with
   | O => zero
-  | S n' => A succ (church_of_nat n')
+  | S n' => A suc (church_of_nat n')
   end.
 
 
 Goal isChurchNumBool (getOpt (eval (church_of_nat 3)) (L (V 0))) = true.
 Proof. reflexivity. Qed.
  
-Definition string_to_church_list(s:string) : list Expr :=
+Definition string_to_church_list(s:string) : list expr :=
   map church_of_nat (string_to_byte s).
 
-Fixpoint listExpr_to_Expr(l:list Expr) : Expr :=
+Fixpoint listExpr_to_Expr(l:list expr) : expr :=
   let EOF := 256 in 
   match l with
   | nil => church_of_nat EOF
   | h :: t => eCons h (listExpr_to_Expr t)
   end.
 
-Fixpoint church_num_to_nat(e:Expr) : option nat :=
+Fixpoint church_num_to_nat(e:expr) : option nat :=
   if isChurchNumBool e
     then
-      Some ((fix count(e:Expr): nat := 
+      Some ((fix count(e:expr): nat := 
        match e with
        | (V 0) => 0
        | A (V 1) e' => S (count e')
@@ -266,16 +263,14 @@ Proof. reflexivity. Qed.
 Example church_num_to_nat_1: church_num_to_nat one = Some 1.
 Proof. reflexivity. Qed.
 
-Fixpoint church_stream_to_string(lst:Expr)(step:nat): string :=
+Fixpoint church_stream_to_string(lst:expr)(step:nat): string :=
   let EOF : nat := 256 in
   match step with
   | O => EmptyString
   | S step' => let anat := (getOpt (church_num_to_nat (eHead lst)) EOF) in if beq_nat anat EOF then EmptyString else String (ascii_of_nat anat) (church_stream_to_string (eTail lst) step')
   end.
 
-End LazyKoq.
-
-
+End Lazykoq.
 (* Example tokenize_ex2 : *)
 (*     Tokenizer.tokenize "(S K) K" %string *)
 (*   = ["(", "S", "K", ")", "K"]%string. *)
@@ -308,4 +303,4 @@ End LazyKoq.
 (* Proof. reflexivity. Qed. *)
 
 
-Extraction "lazyKoq.ml" LazyKoq.
+Extraction "lazykoq.ml" Lazykoq.

@@ -1,9 +1,10 @@
 lazyKoq
 =======
 
-interpreter of lazy K written by Coq
+interpreter of lazy K written by Coq and OCaml
 
-TODO:
-1. function of (lambda formula TO combinator)
-2. function of (string TO Church number)
-3. function of (Church number TO string)
+usage
+./make.sh (コンパイル)
+echo "Hello, LazyKoq!" | ./lazykoq ./sample/echo.lazy
+ #=> "Hello, LazyKoq!"
+
