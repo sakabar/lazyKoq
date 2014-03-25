@@ -24,7 +24,7 @@ open Lazykoq;;
 %token EOF 
 
 %start program
-%type <Lazykoq.expr> program
+%type <Lz.expr> program
 
 %%
 program:
@@ -32,13 +32,13 @@ program:
 ;
 
 ccexpr:
-  | ccexpr expr { Lazykoq.A ($1, $2) }
+  | ccexpr expr { Lz.A ($1, $2) }
   | expr { $1 }
 ;
 
 expr:
-  | I { Lazykoq.i }
-  | K { Lazykoq.k }
-  | S { Lazykoq.s }
+  | I { Lz.i }
+  | K { Lz.k }
+  | S { Lz.s }
   | LPAREN ccexpr RPAREN { $2 }
 

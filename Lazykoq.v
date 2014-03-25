@@ -5,8 +5,8 @@ Require Import ZArith.
 Require Import ExtrOcamlNatInt.
 Require Import ExtrOcamlString.
 Require Import ExtrOcamlZInt.
-(* Require Import Tokenizer. *)
 
+Module Lz.
 
 Notation "[ ]" := nil.
 Notation "[ x , .. , y ]" := (cons x .. (cons y []) ..).
@@ -24,8 +24,6 @@ Fixpoint ble_nat (n m : nat) : bool :=
       end
   end.
 
-Module Lazykoq.
-
 (* ラムダ式 *)
 Inductive expr : Type :=
   | V : nat -> expr
@@ -33,15 +31,56 @@ Inductive expr : Type :=
   | A : expr -> expr -> expr
 .
 
+(* Section Sec. *)
+  (* Hypothesis I_eq: forall (x:expr), A (L (V 0)) x = x. *)
+  (* Hypothesis K_eq: forall (x y:expr), A (A (L (L (V 1))) x) y = x. *)
+  (* Hypothesis S_eq: forall (x y z:Expr), *)
+  (*   (A (A (A (L (L (L (A (A (V 2) (V 0)) (A (V 1) (V 0)))))) x) y) z) = (). *)
+
 Open Scope string_scope.
-Fixpoint string_of_expr(e:expr): string :=
-  match e with
-  | V n => "(V " ++ (String (ascii_of_nat (n + 48)) ")")
-  | L e => "(L " ++ (string_of_expr e) ++ ")"
-  | A e1 e2 =>
-    "(A (" ++ (string_of_expr e1) ++ ") " ++
-       "(" ++ (string_of_expr e2) ++"))"
+
+(* TODO *)
+Definition string_of_nat(n:nat) : string :=
+  match n with
+  | 0 => "0"
+  | 1 => "1"
+  | 2 => "2"
+  | 3 => "3"
+  | 4 => "4"
+  | 5 => "5"
+  | 6 => "6"
+  | 7 => "7"
+  | 8 => "8"
+  | 9 => "9"
+  | _ => ""
   end.
+
+(* TODO: *)
+(* nat -> 桁数 *)
+(* nat -> 桁ごとのリスト *)
+(* 桁ごとのリスト -> string *)
+
+(* 型が合わないので定義できていない *)
+(* Function getDigitList(z:Z) {measure z}: list Z := *)
+(*   match Zcompare z 10 with *)
+(*   | Gt => [z] *)
+(*   | _  => app (getDigitList (Zdiv z 10)) [Zmod z 10] *)
+(*   end. *)
+
+Fixpoint charList_of_expr(e:expr): string :=
+  match e with
+  | V n => "(V " ++ (string_of_nat n) ++ ")"
+  | L e => "(L " ++ (charList_of_expr e) ++ ")"
+  | A e1 e2 =>
+    "(A (" ++ (charList_of_expr e1) ++ ") " ++
+       "(" ++ (charList_of_expr e2) ++"))"
+  end.
+
+Example charList_of_expr_ex1: charList_of_expr (V 0) = "(V 0)".
+Proof. reflexivity. Qed.
+
+Example charList_of_expr_ex2: charList_of_expr (L (V 0)) = "(L (V 0))".
+Proof. reflexivity. Qed.
 
 Fixpoint expr_eq(e1 e2:expr) : bool :=
   match e1, e2 with
@@ -140,6 +179,9 @@ Definition eCons(x y:expr) : expr :=
 Definition eHead(lst:expr) := (A lst k).
 Definition eTail(lst:expr) := (A lst (A k i)).
 
+(* Eval compute in eval (A (A (eHead (eCons zero one)) (V 1)) (V 0)) . *)
+
+
 Goal eval (eHead (eCons (V 1) (V 2))) = Some (V 0).
 Proof.
   simpl.
@@ -217,12 +259,15 @@ Goal isChurchNumBool threeQ = true.
 Proof. reflexivity. Qed.
 
 (* (標準入力の)文字列をバイト列に変換する *)
-Fixpoint string_to_byte(s:string) : list nat :=
-  let EOF := 256 in
+Fixpoint byteList_of_string(s:string) : list nat :=
+  let EOS := 256 in
   match s with
-  | EmptyString => [EOF]
-  | String a s' => (nat_of_ascii a) :: string_to_byte s'
+  | EmptyString => [EOS]
+  | String a s' => (nat_of_ascii a) :: byteList_of_string s'
   end.
+
+Goal byteList_of_string "ABC" = [65, 66, 67, 256].
+Proof. reflexivity. Qed.
 
 (* 自然数をチャーチ数に変換する *)
 Fixpoint church_of_nat(n:nat) : expr :=
@@ -235,17 +280,21 @@ Fixpoint church_of_nat(n:nat) : expr :=
 Goal isChurchNumBool (getOpt (eval (church_of_nat 3)) (L (V 0))) = true.
 Proof. reflexivity. Qed.
  
-Definition string_to_church_list(s:string) : list expr :=
-  map church_of_nat (string_to_byte s).
+Definition churchList_of_string(s:string) : list expr :=
+  map church_of_nat (byteList_of_string s).
 
-Fixpoint listExpr_to_Expr(l:list expr) : expr :=
-  let EOF := 256 in 
+
+Fixpoint expr_of_exprList(l:list expr) : expr :=
+  let EOS := 256 in 
   match l with
-  | nil => church_of_nat EOF
-  | h :: t => eCons h (listExpr_to_Expr t)
+  | nil => church_of_nat EOS
+  | h :: t => eCons h (expr_of_exprList t)
   end.
 
-Fixpoint church_num_to_nat(e:expr) : option nat :=
+(* OCamlで使う *)
+Definition expr_of_string(s:string) : expr := expr_of_exprList (churchList_of_string s).
+
+Fixpoint nat_of_churchNum(e:expr) : option nat :=
   if isChurchNumBool e
     then
       Some ((fix count(e:expr): nat := 
@@ -257,50 +306,84 @@ Fixpoint church_num_to_nat(e:expr) : option nat :=
       ) (getOpt (appChurchNum e) i))
     else None.
 
-Example church_num_to_nat_0: church_num_to_nat zero = Some 0.
+Example nat_of_churchNum_0: nat_of_churchNum zero = Some 0.
 Proof. reflexivity. Qed.
 
-Example church_num_to_nat_1: church_num_to_nat one = Some 1.
+Example nat_of_churchNum_1: nat_of_churchNum one = Some 1.
 Proof. reflexivity. Qed.
 
-Fixpoint church_stream_to_string(lst:expr)(step:nat): string :=
-  let EOF : nat := 256 in
-  match step with
-  | O => EmptyString
-  | S step' => let anat := (getOpt (church_num_to_nat (eHead lst)) EOF) in if beq_nat anat EOF then EmptyString else String (ascii_of_nat anat) (church_stream_to_string (eTail lst) step')
+(* 2つの変数を適用して評価した結果で判定する *)
+(* exprの構成そのもので判定するわけではない*)
+Fixpoint church_num_eq(e1 e2:expr): bool :=
+  let e1' := appChurchNum e1 in
+  let e2' := appChurchNum e2 in
+  match e1', e2' with
+  | Some exp1, Some exp2 => expr_eq exp1 exp2
+  | Some _, None => false
+  | None, Some _ => false
+  | None, None => false
   end.
 
-End Lazykoq.
-(* Example tokenize_ex2 : *)
-(*     Tokenizer.tokenize "(S K) K" %string *)
-(*   = ["(", "S", "K", ")", "K"]%string. *)
-(* Proof. reflexivity. Qed. *)
+Fixpoint string_of_churchStream(lst:expr): string :=
+( fix string_of_churchStream'(lst:expr)(step:nat): string :=
+  let EOS : nat := 256 in
+  match step with
+  | O => EmptyString
+  | S step' => let hdAscii := (getOpt (nat_of_churchNum (eHead lst)) EOS) in
+    if beq_nat hdAscii EOS then EmptyString else String (ascii_of_nat hdAscii) (string_of_churchStream' (eTail lst) step')
+  end ) lst 500.
 
-(* Definition isCombinator(c : ascii) : bool := *)
-(*   let n := nat_of_ascii c in *)
-(*   (orb (beq_nat n 83) (orb (beq_nat n 75) (orb (beq_nat n 73) *)
-(*        (orb (beq_nat n 115) (orb (beq_nat n 107) (beq_nat n 105)))))). *)
+Example church_num_eq_test1: church_num_eq (A suc zero) one = true.
+Proof. reflexivity. Qed.
 
-(* Example sisCombinatorCap: isCombinator "S"%char = true. *)
-(* Proof. reflexivity. Qed. *)
+Example church_num_eq_test2: church_num_eq (A suc zero) zero = false.
+Proof. reflexivity. Qed.
 
-(* Example SisCombinatorSm: isCombinator "s"%char = true. *)
-(* Proof. reflexivity. Qed. *)
+Goal church_num_eq (eHead (eCons zero one)) zero = true.
+Proof. reflexivity. Qed.
 
-(* Example KisCombinatorCap: isCombinator "K"%char = true. *)
-(* Proof. reflexivity. Qed. *)
+Goal church_num_eq (eHead (eCons zero one)) zero = true.
+Proof. reflexivity. Qed.
 
-(* Example KisCombinatorSm: isCombinator "k"%char = true. *)
-(* Proof. reflexivity. Qed. *)
+Goal church_num_eq (eTail (eCons zero one)) one = true.
+Proof. reflexivity. Qed.
 
-(* Example IisCombinatorCap: isCombinator "I"%char = true. *)
-(* Proof. reflexivity. Qed. *)
+Goal church_num_eq (eTail (eCons zero one)) zero = false.
+Proof. reflexivity. Qed.
 
-(* Example IisCombinatorSm: isCombinator "i"%char = true. *)
-(* Proof. reflexivity. Qed. *)
+Goal forall(x y:expr),
+  church_num_eq (eHead (eCons x y)) x = true.
+Proof. 
+  intros x y.
+  unfold eCons.
+  unfold eHead.
+Abort.  
+  
+Goal forall(x y:expr),
+  church_num_eq (eTail (eCons x y)) y = true.
+Proof.
+Abort.
+(* reflexivity. Qed. *)
 
-(* Example AisNotCombinator: isCombinator "a"%char = false. *)
-(* Proof. reflexivity. Qed. *)
+Inductive isSKI: expr -> Prop :=
+  | eq_i : isSKI i
+  | eq_k : isSKI k
+  | eq_s : isSKI s
+  | app_i : forall e:expr, isSKI e -> isSKI (A e i)
+  | app_k : forall e:expr, isSKI e -> isSKI (A e k)
+  | app_s : forall e:expr, isSKI e -> isSKI (A e s)
+.
 
+(* Ltac isSKI_tac: *)
 
-Extraction "lazykoq.ml" Lazykoq.
+Example isSKI_ex1: isSKI (A s i).
+Proof.
+  apply app_i.
+  apply eq_s.
+Qed.
+
+(* End Sec. *)
+End Lz.
+
+Extract Inductive option => "option" ["Some" "None"].
+Extraction "lazykoq.ml" Lz.

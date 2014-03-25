@@ -16,7 +16,7 @@ rule token = parse
   | ')'       { RPAREN }
   
   (* 制御記号 *)
-  | eof       { raise End_of_file }
+  | eof       { EOF } (* { raise End_of_file } *)
 
   (* スペースを読み飛ばす *)
   | space+    { token lexbuf }

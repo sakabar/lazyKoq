@@ -11,6 +11,7 @@
 #実行ファイル
 a.out
 lazykoq
+main
 
 #lazykoq.vから生成される
 lazyKoq.ml
@@ -21,7 +22,6 @@ lexer.ml
 lexer.mli
 
 #parser.mlyから生成される
->>>>>>> feature_lex_yacc
 parser.ml
 parser.mli
 
