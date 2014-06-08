@@ -3,8 +3,12 @@ lazyKoq
 
 interpreter of lazy K written by Coq and OCaml
 
-usage
+How to compile
+
 ./make.sh (コンパイル)
-echo "Hello, LazyKoq!" | ./lazykoq ./sample/echo.lazy
- #=> "Hello, LazyKoq!"
+
+usage
+
+echo "Hello, LazyKoq" | ./lazykoq ./sample/echo.lazy
+ #=> "Hello, LazyKoq"
 
