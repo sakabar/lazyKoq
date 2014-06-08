@@ -5,6 +5,7 @@ Require Import ZArith.
 Require Import ExtrOcamlNatInt.
 Require Import ExtrOcamlString.
 Require Import ExtrOcamlZInt.
+Require Import ExtrOcamlBasic.
 
 Module Lz.
 
@@ -24,18 +25,14 @@ Fixpoint ble_nat (n m : nat) : bool :=
       end
   end.
 
+(* Section Sec. *)
+
 (* ラムダ式 *)
 Inductive expr : Type :=
   | V : nat -> expr
   | L : expr -> expr
   | A : expr -> expr -> expr
 .
-
-(* Section Sec. *)
-  (* Hypothesis I_eq: forall (x:expr), A (L (V 0)) x = x. *)
-  (* Hypothesis K_eq: forall (x y:expr), A (A (L (L (V 1))) x) y = x. *)
-  (* Hypothesis S_eq: forall (x y z:Expr), *)
-  (*   (A (A (A (L (L (L (A (A (V 2) (V 0)) (A (V 1) (V 0)))))) x) y) z) = (). *)
 
 Open Scope string_scope.
 
@@ -168,6 +165,9 @@ Fixpoint eval(t:expr) : option expr :=
   | S step' => if expr_eq t (eval1 t) then Some t else eval' (eval1 t) step'
   end ) t 500.
 
+(* Hypothesis eval_hypo: forall(x:expr), eval x = eval (eval1 x). *)
+
+
 Definition zero := (L (L (V 0))).
 Definition one := (L (L (A (V 1) (V 0)))).
 Definition two := (L (L (A (V 1) (A (V 1) (V 0))))).
@@ -179,9 +179,6 @@ Definition eCons(x y:expr) : expr :=
 Definition eHead(lst:expr) := (A lst k).
 Definition eTail(lst:expr) := (A lst (A k i)).
 
-(* Eval compute in eval (A (A (eHead (eCons zero one)) (V 1)) (V 0)) . *)
-
-
 Goal eval (eHead (eCons (V 1) (V 2))) = Some (V 0).
 Proof.
   simpl.
@@ -190,6 +187,8 @@ Proof.
   simpl.
   reflexivity.
 Qed.
+
+(* Eval compute in eval (eTail (eCons (V 1) (V 2))). *)
 
 Goal eval (eTail (eCons (V 1) (V 2))) = Some (V 0).
 Proof.
@@ -269,6 +268,7 @@ Fixpoint byteList_of_string(s:string) : list nat :=
 Goal byteList_of_string "ABC" = [65, 66, 67, 256].
 Proof. reflexivity. Qed.
 
+
 (* 自然数をチャーチ数に変換する *)
 Fixpoint church_of_nat(n:nat) : expr :=
   match n with
@@ -333,6 +333,9 @@ Fixpoint string_of_churchStream(lst:expr): string :=
     if beq_nat hdAscii EOS then EmptyString else String (ascii_of_nat hdAscii) (string_of_churchStream' (eTail lst) step')
   end ) lst 500.
 
+(* Eval compute in string_of_churchStream (expr_of_string "a"). *)
+
+
 Example church_num_eq_test1: church_num_eq (A suc zero) one = true.
 Proof. reflexivity. Qed.
 
@@ -350,6 +353,9 @@ Proof. reflexivity. Qed.
 
 Goal church_num_eq (eTail (eCons zero one)) zero = false.
 Proof. reflexivity. Qed.
+
+(* Eval compute in eval1 (eval1 (eval1 (eHead (eCons zero one)))). *)
+
 
 Goal forall(x y:expr),
   church_num_eq (eHead (eCons x y)) x = true.
@@ -374,16 +380,50 @@ Inductive isSKI: expr -> Prop :=
   | app_s : forall e:expr, isSKI e -> isSKI (A e s)
 .
 
-(* Ltac isSKI_tac: *)
+Ltac isSKI_tac :=
+  repeat (try apply app_i;
+  try apply app_k;
+  try apply app_s;
+  try apply eq_i;
+  try apply eq_s;
+  try apply eq_k).
 
 Example isSKI_ex1: isSKI (A s i).
 Proof.
-  apply app_i.
-  apply eq_s.
+  isSKI_tac.
 Qed.
+
+Example isSKI_ex2: isSKI (A s (L (V 0))).
+Proof.
+  isSKI_tac.
+Qed.
+
+Inductive combinator: Type :=
+  | vI : combinator
+  | vK : combinator
+  | vS : combinator
+  | ap : combinator -> combinator -> combinator
+.
+
+Definition ceval1(c:combinator) : combinator :=
+  match c with
+  | ap vI c1 => c1
+  | ap (ap vK c1) c2 => c1
+  | ap (ap (ap vS c1) c2) c3 => ap (ap c1 c3) (ap c2 c3)
+  | a => a
+  end.
+
+Goal ceval1 (ap vI vI) = vI.
+Proof. reflexivity. Qed.
+
 
 (* End Sec. *)
 End Lz.
 
-Extract Inductive option => "option" ["Some" "None"].
+
 Extraction "lazykoq.ml" Lz.
+
+(* TODO *)
+(* 文字列 <-> バイト列 *)
+(* 数 <-> チャーチ数 *)
+(* これらを変換すると元に戻ることを示したい *)
