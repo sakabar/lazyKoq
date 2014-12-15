@@ -1,0 +1,30 @@
+PROGRAM = lazykoq
+
+FILES[] =
+  parser
+  lexer
+  lazykoq
+  main
+
+# USE_OCAMLFIND = true
+# OCAMLPACKS[] =
+# OCAMLFINDFLAGS = -syntax camlp5o
+
+# ocamldep を走らせる前にファイル生成しておく必要があることを OMake に伝える
+# (OMake は ocamllex と ocamlyacc を使うことは知っている)
+OCamlGeneratedFiles(lexer.ml parser.mli parser.ml)
+
+OCamlProgram($(PROGRAM), $(FILES))
+
+# デフォルト動作:
+#バイトコード(.run)かネイティブコード(.opt)のどちらか又は両方の生成
+.DEFAULT: $(if $(BYTE_ENABLED), $(PROGRAM).run) \
+          $(if $(NATIVE_ENABLED), $(PROGRAM).opt)
+
+# 掃除
+.PHONY: clean
+  rm -f *.vo *.glob \
+        *.mli *.cmi *.cmo *.o *.cmx \
+        parser.ml parser.mli lexer.ml \
+        lazykoq.mli lazykoq.ml \
+        $(PROGRAM).run $(PROGRAM).opt
