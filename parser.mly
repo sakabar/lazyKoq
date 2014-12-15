@@ -1,7 +1,3 @@
-%{
-open Lazykoq;;
-%}
-
 // リテラル
 // なし
 
@@ -21,10 +17,10 @@ open Lazykoq;;
 %token I
 
 // 制御記号
-%token EOF 
+%token EOF
 
 %start program
-%type <Lz.expr> program
+%type <Lazykoq.Lz.expr> program
 
 %%
 program:
@@ -32,13 +28,12 @@ program:
 ;
 
 ccexpr:
-  | ccexpr expr { Lz.A ($1, $2) }
+  | ccexpr expr { Lazykoq.Lz.A ($1, $2) }
   | expr { $1 }
 ;
 
 expr:
-  | I { Lz.i }
-  | K { Lz.k }
-  | S { Lz.s }
+  | I { Lazykoq.Lz.i }
+  | K { Lazykoq.Lz.k }
+  | S { Lazykoq.Lz.s }
   | LPAREN ccexpr RPAREN { $2 }
-
