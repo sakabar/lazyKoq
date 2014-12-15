@@ -23,7 +23,8 @@ OCamlProgram($(PROGRAM), $(FILES))
 
 # 掃除
 .PHONY: clean
-  rm -f *.vo *.glob \
+  rm -f *~ \
+        *.vo *.glob \
         *.mli *.cmi *.cmo *.o *.cmx \
         parser.ml parser.mli lexer.ml \
         lazykoq.mli lazykoq.ml \
